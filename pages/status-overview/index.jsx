@@ -145,29 +145,26 @@ class StatusOverview extends React.Component {
     this.setState({lastUpdatedDateLabel: this.state.lastUpdatedDate.fromNow()})
   }
 
-  refreshMonitors = () => {
-    fetch(`/api/monitors-statuses`, {credentials: 'include'})
-      .then((response) => {
-        return response.json()
-      }).then(monitors => {
+  refreshMonitors = async () => {
+    const response = await fetch(`/api/monitors-statuses`, {credentials: 'include'})
+    const monitors = await response.json()
 
-        let highestStatus = StatusLevels.operational;
+    let highestStatus = StatusLevels.operational;
 
-        monitors.forEach(monitor => {
-          deserializeMonitor(monitor)
+    monitors.forEach(monitor => {
+      deserializeMonitor(monitor)
 
-          if(monitor.status.level > highestStatus.level) {
-            highestStatus = monitor.status
-          }
-        })
+      if(monitor.status.level > highestStatus.level) {
+        highestStatus = monitor.status
+      }
+    })
 
-        this.setState({
-          status: highestStatus,
-          monitors: monitors,
-          lastUpdatedDate: moment(),
-          lastUpdatedDateLabel: moment().fromNow()
-        })
-      })
+    this.setState({
+      status: highestStatus,
+      monitors: monitors,
+      lastUpdatedDate: moment(),
+      lastUpdatedDateLabel: moment().fromNow()
+    })
     this.refreshMonitor()
   }
   refreshMonitor = () => {
@@ -186,10 +183,10 @@ class StatusOverview extends React.Component {
     this.refreshMonitors()
     this.interval = setInterval(() => {
       this.refreshMonitors()
-    }, 5000)
+    }, 30000)
     this.intervalLabel = setInterval(() => {
       this.refreshUpdatedDateLabel()
-    }, 5000)
+    }, 30000)
   }
   componentWillUnmount = () => {
     clearInterval(this.interval)
@@ -210,7 +207,7 @@ class StatusOverview extends React.Component {
         <MonitorOverview>
           <MonitorName>
             {monitor.name}
-            <MonitorUptime>{truncateDecimals(monitor.rollingMonthUptime, 2)}% uptime for the last 30 days</MonitorUptime>
+            <MonitorUptime>{truncateDecimals(monitor.rollingMonthUptime, 2)}% uptime, rolling month</MonitorUptime>
           </MonitorName>
           <MonitorStatus>
             <MonitorStatusIcon>

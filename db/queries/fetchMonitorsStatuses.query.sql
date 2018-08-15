@@ -15,23 +15,28 @@ SELECT
     'title', active_incident.title,
     'description', active_incident.description
   ) ELSE NULL END AS active_incident,
-  COALESCE(incidents.accumulated_downtime, INTERVAL '0 second') AS accumulated_downtime,
   100 * (
-    1 - EXTRACT(EPOCH FROM COALESCE(incidents.accumulated_downtime, INTERVAL '0 second')) / EXTRACT(EPOCH FROM (NOW() - INTERVAL '30 DAYS'))
+    1 - (
+      EXTRACT(EPOCH FROM COALESCE(rolling_month_incidents.accumulated_downtime, INTERVAL '0 second')) 
+      / 
+      EXTRACT(EPOCH FROM (NOW() - (NOW() - INTERVAL '1 month')))
+    )
   ) AS rolling_month_uptime
 FROM monitors AS m
 LEFT JOIN monitor_status_checks AS status ON status.monitor_id = m.id
 LEFT JOIN incidents AS active_incident ON active_incident.monitor_id = m.id AND active_incident.closed_date IS NULL
 LEFT JOIN LATERAL (
-  SELECT SUM(
-    CASE WHEN i.created_date > NOW() - INTERVAL '30 days' THEN i.created_date ELSE NOW() - INTERVAL '30 days' END 
-    -
-    CASE WHEN i.closed_date IS NOT NULL THEN i.closed_date ELSE NOW() END
-  ) AS accumulated_downtime
+  SELECT 
+    i.monitor_id,
+    SUM(
+      CASE WHEN i.closed_date IS NOT NULL THEN i.closed_date ELSE NOW() END
+      -
+      CASE WHEN i.created_date > NOW() - INTERVAL '1 month' THEN i.created_date ELSE NOW() - INTERVAL '1 month' END 
+    ) AS accumulated_downtime
   FROM incidents AS i
-  WHERE i.monitor_id = m.id
-    AND i.closed_date IS NULL OR i.closed_date > NOW() - INTERVAL '30 days'
+  WHERE i.closed_date IS NULL OR i.closed_date > NOW() - INTERVAL '1 month'
     AND i.count_as_downtime = TRUE
-) AS incidents ON 1=1
+  GROUP BY i.monitor_id
+) AS rolling_month_incidents ON rolling_month_incidents.monitor_id = m.id
 WHERE (m.is_public = TRUE OR $1::BOOLEAN = TRUE)
 ORDER BY m.name ASC
