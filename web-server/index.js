@@ -31,7 +31,18 @@ app.prepare()
   .then(migration)
   .then(() => {
     const server = express()
-
+    if (conf.isProduction) {
+      server.use((req, res, next) => {
+        if (req.headers['x-forwarded-proto'] === 'http') {
+          res.writeHead(301, {
+            Location: `https://${req.headers.host}${req.url}`
+          });
+          res.end();
+        } else {
+          next()
+        }
+      })
+    }
     server.use(auth.serveLogin())
     server.use(bodyParser.json())
     server.use('/api', api(auth))
